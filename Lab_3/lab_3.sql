@@ -275,6 +275,116 @@ SELECT client_id, check_out_date,
        (LEAD(check_in_date) OVER (PARTITION BY client_id ORDER BY check_in_date)) - check_out_date as days_between_visits
 FROM bookings;
 
+-- =======================================================
+-- БЛОК 8: Просунута аналітика PostgreSQL (Запити 41-50)
+-- =======================================================
+
+-- Запит 41. Віконна функція з фреймами (Moving Average): 
+-- Ковзне середнє вартості останніх 3-х бронювань для кожного клієнта
+SELECT client_id, check_in_date, total_price,
+       AVG(total_price) OVER (
+           PARTITION BY client_id 
+           ORDER BY check_in_date 
+           ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+       ) as moving_avg_price
+FROM bookings;
+
+-- Запит 42. Віконна функція NTILE(): 
+-- Розподіл клієнтів на 4 групи (квартилі) за загальною сумою їхніх витрат
+WITH ClientTotals AS (
+    SELECT client_id, SUM(total_price) as total_spent 
+    FROM bookings 
+    GROUP BY client_id
+)
+SELECT client_id, total_spent,
+       NTILE(4) OVER (ORDER BY total_spent DESC) as spending_quartile
+FROM ClientTotals;
+
+-- Запит 43. Оператор ALL з підзапитом: 
+-- Знайти типи номерів, ціна за ніч яких строго більша за ВСІ номери на 1-му поверсі
+SELECT type_name, price_per_night 
+FROM room_types 
+WHERE price_per_night > ALL (
+    SELECT rt.price_per_night 
+    FROM rooms r JOIN room_types rt ON r.type_id = rt.id 
+    WHERE r.floor = 1
+);
+
+-- Запит 44. Агрегація з FILTER (Специфічна функція PostgreSQL): 
+-- Підрахунок кількості бронювань за різними статусами в одному рядку без використання CASE
+SELECT 
+    COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
+    COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
+    COUNT(*) FILTER (WHERE status = 'confirmed') AS confirmed_count
+FROM bookings;
+
+-- Запит 45. Складна генерація дат (RECURSIVE CTE) + LEFT JOIN: 
+-- Знайти дні у жовтні 2023 року, коли до готелю не було ЖОДНОГО заїзду
+WITH RECURSIVE OctoberDays AS (
+    SELECT '2023-10-01'::DATE as day
+    UNION ALL
+    SELECT day + INTERVAL '1 day' FROM OctoberDays WHERE day < '2023-10-31'
+)
+SELECT od.day AS empty_checkin_days
+FROM OctoberDays od
+LEFT JOIN bookings b ON od.day = b.check_in_date
+WHERE b.id IS NULL;
+
+-- Запит 46. Віконна функція FIRST_VALUE(): 
+-- Порівняння вартості поточного бронювання з найпершим бронюванням цього ж клієнта
+SELECT client_id, check_in_date, total_price,
+       FIRST_VALUE(total_price) OVER (PARTITION BY client_id ORDER BY check_in_date) as first_booking_price,
+       total_price - FIRST_VALUE(total_price) OVER (PARTITION BY client_id ORDER BY check_in_date) as diff_from_first
+FROM bookings;
+
+-- Запит 47. Агрегація рядків (STRING_AGG): 
+-- Вивести ID бронювання і через кому назви всіх замовлених додаткових послуг
+SELECT b.id AS booking_id, 
+       STRING_AGG(s.service_name, ', ') AS ordered_services_list
+FROM bookings b
+JOIN booking_services bs ON b.id = bs.booking_id
+JOIN services s ON bs.service_id = s.id
+GROUP BY b.id;
+
+-- Запит 48. Вкладені підзапити з ANY: 
+-- Знайти імена клієнтів, які хоча б раз бронювали номер найвищого класу ('Suite')
+SELECT first_name, last_name FROM clients
+WHERE id = ANY (
+    SELECT client_id FROM bookings WHERE room_id = ANY (
+        SELECT id FROM rooms WHERE type_id = (
+            SELECT id FROM room_types WHERE type_name = 'Suite'
+        )
+    )
+);
+
+-- Запит 49. Корельований підзапит в блоці SELECT: 
+-- Знайти для кожного клієнта його "найулюбленіший" тип номеру (який він бронював найчастіше)
+SELECT c.first_name, c.last_name,
+       (SELECT rt.type_name 
+        FROM bookings b 
+        JOIN rooms r ON b.room_id = r.id 
+        JOIN room_types rt ON r.type_id = rt.id
+        WHERE b.client_id = c.id
+        GROUP BY rt.type_name 
+        ORDER BY COUNT(*) DESC 
+        LIMIT 1) AS favorite_room_type
+FROM clients c;
+
+-- Запит 50. Комбінація CTE, JOIN, підзапитів та Window Functions (Аналіз VIP-клієнтів):
+-- Знайти клієнтів, чиї витрати входять у ТОП-3 по готелю, та показати, який відсоток від загального доходу вони принесли
+WITH ClientRevenue AS (
+    SELECT client_id, SUM(total_price) as total_spent
+    FROM bookings 
+    WHERE status = 'completed'
+    GROUP BY client_id
+),
+RankedClients AS (
+    SELECT client_id, total_spent,
+           RANK() OVER (ORDER BY total_spent DESC) as rev_rank,
+           (SELECT SUM(total_price) FROM bookings WHERE status = 'completed') as global_revenue
+    FROM ClientRevenue
+)
+SELECT c.first
 -- Висновки: 
 -- Під час виконання лабораторної роботи було складено 40 SQL-запитів до реляційної бази даних "Готель". 
 -- На практиці закріплено використання логічних операторів, агрегатних функцій для аналізу даних, 
