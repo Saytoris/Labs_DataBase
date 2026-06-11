@@ -1,0 +1,54 @@
+db.Enrollments.insertOne({
+  enrNO: "enr1",
+  studentEmail: "ivan@g.com",
+  semester: new Date("2024-09-1"),
+  items: [
+    {	
+  	course: "Cloud Discipline",
+    grade: "100"  
+  	},  
+    {	
+  	course: "Math",
+  	grade:"100" ,
+    }  
+  		],
+  status: "Enrolled"
+})
+#find
+db.Enrollments.find({ 
+  _id: ObjectId("69b17a5e90d0a43ff0730d4d") 
+})
+#update
+db.Enrollments.updateOne(
+  { _id: ObjectId("69b17a5e90d0a43ff0730d4d") }, // 1. Find the document
+  { 
+    $set: { status: "Graduated" }               // 2. Apply the change
+  }
+)
+#updateResponce
+{
+  acknowledged: true,
+  insertedId: null,
+  matchedCount: 1,
+  modifiedCount: 1,
+  upsertedCount: 0
+}
+#delete
+db.Enrollments.deleteOne(
+  { _id: ObjectId("69b17a5e90d0a43ff0730d4d") } // Finds and removes the whole document
+)
+#deleteResponce
+{
+  acknowledged: true,
+  deletedCount: 1
+}
+
+db.Enrollments.createIndex(
+  { "items.course": 1, "items.grade": 1 } 
+)
+
+db.Enrollments.createIndex(
+  { status: 1, semester: -1 } 
+)
+
+db.Courses.find({ status: "Completed" }).explain("executionStats")

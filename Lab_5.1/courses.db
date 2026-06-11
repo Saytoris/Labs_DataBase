@@ -1,0 +1,32 @@
+db.Courses.insertMany([
+  {title:"Cloud Discipline",credits:"3",department:"FIT"},
+  {title:"Data Base",credits:"4",department:"FIT"},
+  
+  
+  ])
+db.Courses.insertMany([
+  {title:"Math",credits:"1000000000",department:"FIT"},
+  {title:"OOP",credits:"4",department:"FIT"},
+  
+  
+  ])
+#testGte  
+db.Courses.insertOne({title:"Cloud Lets",credits:3,department:"FIT"})  
+db.Courses.find({ credits: { $gte: 3 } })
+
+#testIn 
+db.Courses.find({ title: { $in: ["OOP", "Cloud Discipline"] } })
+
+#testAnd
+db.Courses.find({
+  $and: [
+    { title: "Cloud Discipline" },
+    { department: "FIT" } 
+  ]
+})
+
+#testOr
+db.Courses.find({ $or: [ { credits: "3" }, { credits: "4" } ] })
+
+
+ 

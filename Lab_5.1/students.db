@@ -1,0 +1,18 @@
+db.Students.insertMany([
+  {name:"Sveta", email:"sveta@g.com",group:"MIT-11"},
+  {name:"Vasya", email:"vasya@g.com",group:"MIT-11"}
+
+])
+db.Students.insertMany([
+  {name:"Ivan", email:"ivan@g.com",group:"MIT-11"}
+])
+#request(1/5)
+db["Students"].find({
+  $and:[{name: "Vasya" }, {group: "MIT-11"}
+    
+  ]
+})
+db.Students.createIndex(
+  { email: 1 }, 
+  { unique: true }     
+)
